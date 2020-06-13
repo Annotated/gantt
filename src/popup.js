@@ -19,14 +19,14 @@ export default class Popup {
         this.pointer = this.parent.querySelector('.pointer');
     }
 
-    show(options) {
+    show(e, options) {
         if (!options.target_element) {
             throw new Error('target_element is required to show popup');
         }
+
         if (!options.position) {
             options.position = 'left';
         }
-        const target_element = options.target_element;
 
         if (this.custom_html) {
             let html = this.custom_html(options.task);
@@ -40,18 +40,9 @@ export default class Popup {
             this.parent.style.width = this.parent.clientWidth + 'px';
         }
 
-        // set position
-        let position_meta;
-        if (target_element instanceof HTMLElement) {
-            position_meta = target_element.getBoundingClientRect();
-        } else if (target_element instanceof SVGElement) {
-            position_meta = options.target_element.getBBox();
-        }
-
         if (options.position === 'left') {
-            this.parent.style.left =
-                position_meta.x + (position_meta.width + 10) + 'px';
-            this.parent.style.top = position_meta.y + 'px';
+            this.parent.style.left = Number(e.offsetX) + 30 + 'px';
+            this.parent.style.top = e.offsetY + 30 + 'px';
 
             this.pointer.style.transform = 'rotateZ(90deg)';
             this.pointer.style.left = '-7px';

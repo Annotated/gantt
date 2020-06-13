@@ -24,6 +24,20 @@ const month_names = {
         'November',
         'December'
     ],
+    es: [
+        'Enero',
+        'Febrero',
+        'Marzo',
+        'Abril',
+        'Mayo',
+        'Junio',
+        'Julio',
+        'Agosto',
+        'Septiembre',
+        'Octubre',
+        'Noviembre',
+        'Diciembre'
+    ],
     ru: [
         'Январь',
         'Февраль',
@@ -37,6 +51,62 @@ const month_names = {
         'Октябрь',
         'Ноябрь',
         'Декабрь'
+    ],
+    ptBr: [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro'
+    ],
+    fr: [
+        'Janvier',
+        'Février',
+        'Mars',
+        'Avril',
+        'Mai',
+        'Juin',
+        'Juillet',
+        'Août',
+        'Septembre',
+        'Octobre',
+        'Novembre',
+        'Décembre'
+    ],
+    tr: [
+        'Ocak',
+        'Şubat',
+        'Mart',
+        'Nisan',
+        'Mayıs',
+        'Haziran',
+        'Temmuz',
+        'Ağustos',
+        'Eylül',
+        'Ekim',
+        'Kasım',
+        'Aralık'
+    ],
+    zh: [
+        '一月',
+        '二月',
+        '三月',
+        '四月',
+        '五月',
+        '六月',
+        '七月',
+        '八月',
+        '九月',
+        '十月',
+        '十一月',
+        '十二月'
     ]
 };
 
@@ -102,7 +172,7 @@ var date_utils = {
             HH: values[3],
             mm: values[4],
             ss: values[5],
-            SSS:values[6],
+            SSS: values[6],
             D: values[2],
             MMMM: month_names[lang][+values[1]],
             MMM: month_names[lang][+values[1]]
@@ -391,6 +461,369 @@ $.attr = (element, attr, value) => {
     element.setAttribute(attr, value);
 };
 
+const hsv2hsl = function(hue, sat, val) {
+    return [
+        hue,
+        sat * val / ((hue = (2 - sat) * val) < 1 ? hue : 2 - hue) || 0,
+        hue / 2
+    ];
+};
+
+// Need to handle 1.0 as 100%, since once it is a number, there is no difference between it and 1
+// <http://stackoverflow.com/questions/7422072/javascript-how-to-detect-number-as-a-decimal-including-1-0>
+const isOnePointZero = function(n) {
+    return (
+        typeof n === 'string' && n.indexOf('.') !== -1 && parseFloat(n) === 1
+    );
+};
+
+const isPercentage = function(n) {
+    return typeof n === 'string' && n.indexOf('%') !== -1;
+};
+
+// Take input from [0, n] and return it as [0, 1]
+const bound01 = function(value, max) {
+    if (isOnePointZero(value)) value = '100%';
+
+    const processPercent = isPercentage(value);
+    value = Math.min(max, Math.max(0, parseFloat(value)));
+
+    // Automatically convert percentage into number
+    if (processPercent) {
+        value = parseInt(value * max, 10) / 100;
+    }
+
+    // Handle floating point rounding errors
+    if (Math.abs(value - max) < 0.000001) {
+        return 1;
+    }
+
+    // Convert into [0, 1] range if it isn't already
+    return (value % max) / parseFloat(max);
+};
+
+const INT_HEX_MAP = { 10: 'A', 11: 'B', 12: 'C', 13: 'D', 14: 'E', 15: 'F' };
+
+const toHex = function({ r, g, b }) {
+    const hexOne = function(value) {
+        value = Math.min(Math.round(value), 255);
+        const high = Math.floor(value / 16);
+        const low = value % 16;
+        return '' + (INT_HEX_MAP[high] || high) + (INT_HEX_MAP[low] || low);
+    };
+
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return '';
+
+    return '#' + hexOne(r) + hexOne(g) + hexOne(b);
+};
+
+const HEX_INT_MAP = { A: 10, B: 11, C: 12, D: 13, E: 14, F: 15 };
+
+const parseHexChannel = function(hex) {
+    if (hex.length === 2) {
+        return (
+            (HEX_INT_MAP[hex[0].toUpperCase()] || +hex[0]) * 16 +
+            (HEX_INT_MAP[hex[1].toUpperCase()] || +hex[1])
+        );
+    }
+
+    return HEX_INT_MAP[hex[1].toUpperCase()] || +hex[1];
+};
+
+const hsl2hsv = function(hue, sat, light) {
+    sat = sat / 100;
+    light = light / 100;
+    let smin = sat;
+    const lmin = Math.max(light, 0.01);
+    let sv;
+    let v;
+
+    light *= 2;
+    sat *= light <= 1 ? light : 2 - light;
+    smin *= lmin <= 1 ? lmin : 2 - lmin;
+    v = (light + sat) / 2;
+    sv = light === 0 ? 2 * smin / (lmin + smin) : 2 * sat / (light + sat);
+
+    return {
+        h: hue,
+        s: sv * 100,
+        v: v * 100
+    };
+};
+
+// `rgbToHsv`
+// Converts an RGB color value to HSV
+// *Assumes:* r, g, and b are contained in the set [0, 255] or [0, 1]
+// *Returns:* { h, s, v } in [0,1]
+const rgb2hsv = function(r, g, b) {
+    r = bound01(r, 255);
+    g = bound01(g, 255);
+    b = bound01(b, 255);
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h, s;
+    let v = max;
+
+    const d = max - min;
+    s = max === 0 ? 0 : d / max;
+
+    if (max === min) {
+        h = 0; // achromatic
+    } else {
+        switch (max) {
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0);
+                break;
+            case g:
+                h = (b - r) / d + 2;
+                break;
+            case b:
+                h = (r - g) / d + 4;
+                break;
+        }
+        h /= 6;
+    }
+
+    return { h: h * 360, s: s * 100, v: v * 100 };
+};
+
+// `hsvToRgb`
+// Converts an HSV color value to RGB.
+// *Assumes:* h is contained in [0, 1] or [0, 360] and s and v are contained in [0, 1] or [0, 100]
+// *Returns:* { r, g, b } in the set [0, 255]
+const hsv2rgb = function(h, s, v) {
+    h = bound01(h, 360) * 6;
+    s = bound01(s, 100);
+    v = bound01(v, 100);
+
+    const i = Math.floor(h);
+    const f = h - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+    const mod = i % 6;
+    const r = [v, q, p, p, t, v][mod];
+    const g = [t, v, v, q, p, p][mod];
+    const b = [p, p, t, v, v, q][mod];
+
+    return {
+        r: Math.round(r * 255),
+        g: Math.round(g * 255),
+        b: Math.round(b * 255)
+    };
+};
+
+class Color {
+    constructor(options) {
+        this._hue = 0;
+        this._saturation = 100;
+        this._value = 100;
+        this._alpha = 100;
+
+        this.enableAlpha = false;
+        this.format = 'hex';
+        this.value = '';
+        this.progress = '';
+
+        options = options || {};
+
+        for (let option in options) {
+            if (options.hasOwnProperty(option)) {
+                this[option] = options[option];
+            }
+        }
+
+        this.doOnChange();
+    }
+
+    set(prop, value) {
+        if (arguments.length === 1 && typeof prop === 'object') {
+            for (let p in prop) {
+                if (prop.hasOwnProperty(p)) {
+                    this.set(p, prop[p]);
+                }
+            }
+
+            return;
+        }
+
+        this['_' + prop] = value;
+        this.doOnChange();
+    }
+
+    get(prop) {
+        return this['_' + prop];
+    }
+
+    toRgb() {
+        return hsv2rgb(this._hue, this._saturation, this._value);
+    }
+
+    fromString(value) {
+        if (!value) {
+            this._hue = 0;
+            this._saturation = 100;
+            this._value = 100;
+
+            this.doOnChange();
+            return;
+        }
+
+        const fromHSV = (h, s, v) => {
+            this._hue = Math.max(0, Math.min(360, h));
+            this._saturation = Math.max(0, Math.min(100, s));
+            this._value = Math.max(0, Math.min(100, v));
+
+            this.doOnChange();
+        };
+
+        if (value.indexOf('hsl') !== -1) {
+            const parts = value
+                .replace(/hsla|hsl|\(|\)/gm, '')
+                .split(/\s|,/g)
+                .filter(val => val !== '')
+                .map(
+                    (val, index) =>
+                        index > 2 ? parseFloat(val) : parseInt(val, 10)
+                );
+
+            if (parts.length === 4) {
+                this._alpha = Math.floor(parseFloat(parts[3]) * 100);
+            } else if (parts.length === 3) {
+                this._alpha = 100;
+            }
+            if (parts.length >= 3) {
+                const { h, s, v } = hsl2hsv(parts[0], parts[1], parts[2]);
+                fromHSV(h, s, v);
+            }
+        } else if (value.indexOf('hsv') !== -1) {
+            const parts = value
+                .replace(/hsva|hsv|\(|\)/gm, '')
+                .split(/\s|,/g)
+                .filter(val => val !== '')
+                .map(
+                    (val, index) =>
+                        index > 2 ? parseFloat(val) : parseInt(val, 10)
+                );
+
+            if (parts.length === 4) {
+                this._alpha = Math.floor(parseFloat(parts[3]) * 100);
+            } else if (parts.length === 3) {
+                this._alpha = 100;
+            }
+            if (parts.length >= 3) {
+                fromHSV(parts[0], parts[1], parts[2]);
+            }
+        } else if (value.indexOf('rgb') !== -1) {
+            const parts = value
+                .replace(/rgba|rgb|\(|\)/gm, '')
+                .split(/\s|,/g)
+                .filter(val => val !== '')
+                .map(
+                    (val, index) =>
+                        index > 2 ? parseFloat(val) : parseInt(val, 10)
+                );
+
+            if (parts.length === 4) {
+                this._alpha = Math.floor(parseFloat(parts[3]) * 100);
+            } else if (parts.length === 3) {
+                this._alpha = 100;
+            }
+            if (parts.length >= 3) {
+                const { h, s, v } = rgb2hsv(parts[0], parts[1], parts[2]);
+                fromHSV(h, s, v);
+            }
+        } else if (value.indexOf('#') !== -1) {
+            const hex = value.replace('#', '').trim();
+            let r, g, b;
+
+            if (hex.length === 3) {
+                r = parseHexChannel(hex[0] + hex[0]);
+                g = parseHexChannel(hex[1] + hex[1]);
+                b = parseHexChannel(hex[2] + hex[2]);
+            } else if (hex.length === 6 || hex.length === 8) {
+                r = parseHexChannel(hex.substring(0, 2));
+                g = parseHexChannel(hex.substring(2, 4));
+                b = parseHexChannel(hex.substring(4, 6));
+            }
+
+            if (hex.length === 8) {
+                this._alpha = Math.floor(
+                    parseHexChannel(hex.substring(6)) / 255 * 100
+                );
+            } else if (hex.length === 3 || hex.length === 6) {
+                this._alpha = 100;
+            }
+
+            const { h, s, v } = rgb2hsv(r, g, b);
+            fromHSV(h, s, v);
+        }
+    }
+
+    compare(color) {
+        return (
+            Math.abs(color._hue - this._hue) < 2 &&
+            Math.abs(color._saturation - this._saturation) < 1 &&
+            Math.abs(color._value - this._value) < 1 &&
+            Math.abs(color._alpha - this._alpha) < 1
+        );
+    }
+
+    doOnChange() {
+        const { _hue, _saturation, _value, _alpha, format } = this;
+
+        if (this.enableAlpha) {
+            switch (format) {
+                case 'hsl':
+                    const hsl = hsv2hsl(_hue, _saturation / 100, _value / 100);
+                    this.value = `hsla(${_hue}, ${Math.round(
+                        hsl[1] * 100
+                    )}%, ${Math.round(hsl[2] * 100)}%, ${_alpha / 100})`;
+                    this.progress = `hsl(${_hue}, ${Math.round(
+                        hsl[1] * 100
+                    )}%, ${Math.round(hsl[2] * 100) - 12}%, ${_alpha / 100})`;
+                    break;
+                case 'hsv':
+                    this.value = `hsva(${_hue}, ${Math.round(
+                        _saturation
+                    )}%, ${Math.round(_value)}%, ${_alpha / 100})`;
+                    break;
+                default:
+                    const { r, g, b } = hsv2rgb(_hue, _saturation, _value);
+                    this.value = `rgba(${r}, ${g}, ${b}, ${_alpha / 100})`;
+                    this.progress = `rgb(${r - 14}, ${g - 3}, ${b -
+                        18}, ${_alpha / 100})`;
+            }
+        } else {
+            switch (format) {
+                case 'hsl':
+                    const hsl = hsv2hsl(_hue, _saturation / 100, _value / 100);
+                    this.value = `hsl(${_hue}, ${Math.round(
+                        hsl[1] * 100
+                    )}%, ${Math.round(hsl[2] * 100)}%)`;
+                    this.progress = `hsl(${_hue}, ${Math.round(
+                        hsl[1] * 100
+                    )}%, ${Math.round(hsl[2] * 100) - 12}%)`;
+                    break;
+                case 'hsv':
+                    this.value = `hsv(${_hue}, ${Math.round(
+                        _saturation
+                    )}%, ${Math.round(_value)}%)`;
+                    break;
+                case 'rgb':
+                    const { r, g, b } = hsv2rgb(_hue, _saturation, _value);
+                    this.value = `rgb(${r}, ${g}, ${b})`;
+                    this.progress = `rgb(${r - 14}, ${g - 3}, ${b - 18})`;
+                    break;
+                default:
+                    this.value = toHex(hsv2rgb(_hue, _saturation, _value));
+                    this.progress = `rgb(${r - 14}, ${g - 3}, ${b - 18})`;
+            }
+        }
+    }
+}
+
 class Bar {
     constructor(gantt, task) {
         this.set_defaults(gantt, task);
@@ -408,6 +841,7 @@ class Bar {
     prepare() {
         this.prepare_values();
         this.prepare_helpers();
+        this.prepare_color();
     }
 
     prepare_values() {
@@ -456,6 +890,17 @@ class Bar {
         };
     }
 
+    prepare_color() {
+        if (!this.task.color || !this.task.color.fill) return;
+        const currentValueColor = new Color({
+            enableAlpha: this.task.color.enableAlpha || false,
+            format: this.task.color.colorFormat || 'hsl'
+        });
+        currentValueColor.fromString(this.task.color.fill);
+        this.progress_color = currentValueColor.progress;
+        this.fill = currentValueColor.value;
+    }
+
     draw() {
         this.draw_bar();
         this.draw_progress_bar();
@@ -472,6 +917,7 @@ class Bar {
             rx: this.corner_radius,
             ry: this.corner_radius,
             class: 'bar',
+            style: `fill:${this.fill || null}`,
             append_to: this.bar_group
         });
 
@@ -492,6 +938,7 @@ class Bar {
             rx: this.corner_radius,
             ry: this.corner_radius,
             class: 'bar-progress',
+            style: `fill:${this.progress_color || null}`,
             append_to: this.bar_group
         });
 
@@ -538,7 +985,7 @@ class Bar {
             append_to: this.handle_group
         });
 
-        if (this.task.progress && this.task.progress < 100) {
+        if (this.task.progress < 100) {
             this.$handle_progress = createSVG('polygon', {
                 points: this.get_progress_polygon_points().join(','),
                 class: 'handle progress',
@@ -578,21 +1025,25 @@ class Bar {
             this.gantt.unselect_all();
             this.group.classList.toggle('active');
 
-            this.show_popup();
+            this.show_popup(e);
         });
     }
 
-    show_popup() {
+    show_popup(e) {
         if (this.gantt.bar_being_dragged) return;
-
-        const start_date = date_utils.format(this.task._start, 'MMM D');
+        const start_date = date_utils.format(
+            this.task._start,
+            'MMM D',
+            this.gantt.options.language
+        );
         const end_date = date_utils.format(
             date_utils.add(this.task._end, -1, 'second'),
-            'MMM D'
+            'MMM D',
+            this.gantt.options.language
         );
         const subtitle = start_date + ' - ' + end_date;
 
-        this.gantt.show_popup({
+        this.gantt.show_popup(e, {
             target_element: this.$bar,
             title: this.task.name,
             subtitle: subtitle,
@@ -906,14 +1357,14 @@ class Popup {
         this.pointer = this.parent.querySelector('.pointer');
     }
 
-    show(options) {
+    show(e, options) {
         if (!options.target_element) {
             throw new Error('target_element is required to show popup');
         }
+
         if (!options.position) {
             options.position = 'left';
         }
-        const target_element = options.target_element;
 
         if (this.custom_html) {
             let html = this.custom_html(options.task);
@@ -927,18 +1378,9 @@ class Popup {
             this.parent.style.width = this.parent.clientWidth + 'px';
         }
 
-        // set position
-        let position_meta;
-        if (target_element instanceof HTMLElement) {
-            position_meta = target_element.getBoundingClientRect();
-        } else if (target_element instanceof SVGElement) {
-            position_meta = options.target_element.getBBox();
-        }
-
         if (options.position === 'left') {
-            this.parent.style.left =
-                position_meta.x + (position_meta.width + 10) + 'px';
-            this.parent.style.top = position_meta.y + 'px';
+            this.parent.style.left = Number(e.offsetX) + 30 + 'px';
+            this.parent.style.top = e.offsetY + 30 + 'px';
 
             this.pointer.style.transform = 'rotateZ(90deg)';
             this.pointer.style.left = '-7px';
@@ -954,8 +1396,20 @@ class Popup {
     }
 }
 
+const VIEW_MODE = {
+    QUARTER_DAY: 'Quarter Day',
+    HALF_DAY: 'Half Day',
+    DAY: 'Day',
+    WEEK: 'Week',
+    MONTH: 'Month',
+    YEAR: 'Year'
+};
+
+let _tasks = {};
+
 class Gantt {
     constructor(wrapper, tasks, options) {
+        _tasks = tasks;
         this.setup_wrapper(wrapper);
         this.setup_options(options);
         this.setup_tasks(tasks);
@@ -1016,23 +1470,16 @@ class Gantt {
             header_height: 50,
             column_width: 30,
             step: 24,
-            view_modes: [
-                'Quarter Day',
-                'Half Day',
-                'Day',
-                'Week',
-                'Month',
-                'Year'
-            ],
-            bar_height: 20,
-            bar_corner_radius: 3,
+            view_modes: [...Object.values(VIEW_MODE)],
+            bar_height: 30,
+            bar_corner_radius: 0,
             arrow_curve: 5,
             padding: 18,
-            view_mode: 'Day',
+            view_mode: 'Month',
             date_format: 'YYYY-MM-DD',
-            popup_trigger: 'click',
+            popup_trigger: 'mousemove',
             custom_popup_html: null,
-            language: 'en'
+            language: 'zh'
         };
         this.options = Object.assign({}, default_options, options);
     }
@@ -1128,22 +1575,22 @@ class Gantt {
     update_view_scale(view_mode) {
         this.options.view_mode = view_mode;
 
-        if (view_mode === 'Day') {
+        if (view_mode === VIEW_MODE.DAY) {
             this.options.step = 24;
             this.options.column_width = 38;
-        } else if (view_mode === 'Half Day') {
+        } else if (view_mode === VIEW_MODE.HALF_DAY) {
             this.options.step = 24 / 2;
             this.options.column_width = 38;
-        } else if (view_mode === 'Quarter Day') {
+        } else if (view_mode === VIEW_MODE.QUARTER_DAY) {
             this.options.step = 24 / 4;
             this.options.column_width = 38;
-        } else if (view_mode === 'Week') {
+        } else if (view_mode === VIEW_MODE.WEEK) {
             this.options.step = 24 * 7;
             this.options.column_width = 140;
-        } else if (view_mode === 'Month') {
+        } else if (view_mode === VIEW_MODE.MONTH) {
             this.options.step = 24 * 30;
             this.options.column_width = 120;
-        } else if (view_mode === 'Year') {
+        } else if (view_mode === VIEW_MODE.YEAR) {
             this.options.step = 24 * 365;
             this.options.column_width = 120;
         }
@@ -1171,13 +1618,13 @@ class Gantt {
         this.gantt_end = date_utils.start_of(this.gantt_end, 'day');
 
         // add date padding on both sides
-        if (this.view_is(['Quarter Day', 'Half Day'])) {
+        if (this.view_is([VIEW_MODE.QUARTER_DAY, VIEW_MODE.HALF_DAY])) {
             this.gantt_start = date_utils.add(this.gantt_start, -7, 'day');
             this.gantt_end = date_utils.add(this.gantt_end, 7, 'day');
-        } else if (this.view_is('Month')) {
+        } else if (this.view_is(VIEW_MODE.MONTH)) {
             this.gantt_start = date_utils.start_of(this.gantt_start, 'year');
             this.gantt_end = date_utils.add(this.gantt_end, 1, 'year');
-        } else if (this.view_is('Year')) {
+        } else if (this.view_is(VIEW_MODE.YEAR)) {
             this.gantt_start = date_utils.add(this.gantt_start, -2, 'year');
             this.gantt_end = date_utils.add(this.gantt_end, 2, 'year');
         } else {
@@ -1194,9 +1641,9 @@ class Gantt {
             if (!cur_date) {
                 cur_date = date_utils.clone(this.gantt_start);
             } else {
-                if (this.view_is('Year')) {
+                if (this.view_is(VIEW_MODE.YEAR)) {
                     cur_date = date_utils.add(cur_date, 1, 'year');
-                } else if (this.view_is('Month')) {
+                } else if (this.view_is(VIEW_MODE.MONTH)) {
                     cur_date = date_utils.add(cur_date, 1, 'month');
                 } else {
                     cur_date = date_utils.add(
@@ -1325,19 +1772,22 @@ class Gantt {
         for (let date of this.dates) {
             let tick_class = 'tick';
             // thick tick for monday
-            if (this.view_is('Day') && date.getDate() === 1) {
+            if (this.view_is(VIEW_MODE.DAY) && date.getDate() === 1) {
                 tick_class += ' thick';
             }
             // thick tick for first week
             if (
-                this.view_is('Week') &&
+                this.view_is(VIEW_MODE.WEEK) &&
                 date.getDate() >= 1 &&
                 date.getDate() < 8
             ) {
                 tick_class += ' thick';
             }
             // thick ticks for quarters
-            if (this.view_is('Month') && (date.getMonth() + 1) % 3 === 0) {
+            if (
+                this.view_is(VIEW_MODE.MONTH) &&
+                (date.getMonth() + 1) % 3 === 0
+            ) {
                 tick_class += ' thick';
             }
 
@@ -1347,7 +1797,7 @@ class Gantt {
                 append_to: this.layers.grid
             });
 
-            if (this.view_is('Month')) {
+            if (this.view_is(VIEW_MODE.MONTH)) {
                 tick_x +=
                     date_utils.get_days_in_month(date) *
                     this.options.column_width /
@@ -1360,7 +1810,7 @@ class Gantt {
 
     make_grid_highlights() {
         // highlight today's date
-        if (this.view_is('Day')) {
+        if (this.view_is(VIEW_MODE.DAY)) {
             const x =
                 date_utils.diff(date_utils.today(), this.gantt_start, 'hour') /
                 this.options.step *
@@ -1597,6 +2047,7 @@ class Gantt {
         let is_resizing_right = false;
         let parent_bar_id = null;
         let bars = []; // instanceof Bar
+        let task = {};
         this.bar_being_dragged = null;
 
         function action_in_progress() {
@@ -1605,6 +2056,9 @@ class Gantt {
 
         $.on(this.$svg, 'mousedown', '.bar-wrapper, .handle', (e, element) => {
             const bar_wrapper = $.closest('.bar-wrapper', element);
+            parent_bar_id = bar_wrapper.getAttribute('data-id');
+            task = _tasks.find(f => f.id == parent_bar_id);
+            if (task.invalid) return;
 
             if (element.classList.contains('left')) {
                 is_resizing_left = true;
@@ -1619,7 +2073,6 @@ class Gantt {
             x_on_start = e.offsetX;
             y_on_start = e.offsetY;
 
-            parent_bar_id = bar_wrapper.getAttribute('data-id');
             const ids = [
                 parent_bar_id,
                 ...this.get_all_dependent_tasks(parent_bar_id)
@@ -1765,7 +2218,7 @@ class Gantt {
             rem,
             position;
 
-        if (this.view_is('Week')) {
+        if (this.view_is(VIEW_MODE.WEEK)) {
             rem = dx % (this.options.column_width / 7);
             position =
                 odx -
@@ -1773,7 +2226,7 @@ class Gantt {
                 (rem < this.options.column_width / 14
                     ? 0
                     : this.options.column_width / 7);
-        } else if (this.view_is('Month')) {
+        } else if (this.view_is(VIEW_MODE.MONTH)) {
             rem = dx % (this.options.column_width / 30);
             position =
                 odx -
@@ -1823,14 +2276,14 @@ class Gantt {
         });
     }
 
-    show_popup(options) {
+    show_popup(e, options) {
         if (!this.popup) {
             this.popup = new Popup(
                 this.popup_wrapper,
                 this.options.custom_popup_html
             );
         }
-        this.popup.show(options);
+        this.popup.show(e, options);
     }
 
     hide_popup() {
@@ -1867,6 +2320,8 @@ class Gantt {
         this.$svg.innerHTML = '';
     }
 }
+
+Gantt.VIEW_MODE = VIEW_MODE;
 
 function generate_id(task) {
     return (

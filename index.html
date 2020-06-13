@@ -14,7 +14,7 @@
 		}
 		/* custom class */
 		.gantt .bar-milestone .bar {
-			fill: tomato;
+			fill: rgb(133, 248, 66);
 		}
 	</style>
 	<link rel="stylesheet" href="dist/frappe-gantt.css" />
@@ -28,56 +28,98 @@
 	<script>
 		var tasks = [
 			{
-				start: '2018-10-01',
-				end: '2018-10-08',
+				start: '2020-5-01',
+				end: '2020-8-08',
 				name: 'Redesign website',
 				id: "Task 0",
-				progress: 20
+				progress: 20,
+				color: {
+					fill: '#8d43ad',
+					colorFormat: 'rgb',
+					enableAlpha: false,
+				}
 			},
 			{
-				start: '2018-10-03',
-				end: '2018-10-06',
+				start: '2020-5-03',
+				end: '2020-7-06',
 				name: 'Write new content',
 				id: "Task 1",
 				progress: 5,
-				dependencies: 'Task 0'
+				dependencies: 'Task 0',
+				color: {
+					fill: 'hsl(210, 100%, 63%)'
+				}
 			},
 			{
-				start: '2018-10-04',
-				end: '2018-10-08',
+				start: '2020-6-04',
+				end: '2020-7-08',
 				name: 'Apply new styles',
 				id: "Task 2",
 				progress: 10,
 				dependencies: 'Task 1'
 			},
 			{
-				start: '2018-10-08',
-				end: '2018-10-09',
+				start: '2020-7-08',
+				end: '2020-8-09',
 				name: 'Review',
 				id: "Task 3",
 				progress: 5,
 				dependencies: 'Task 2'
 			},
 			{
-				start: '2018-10-08',
-				end: '2018-10-10',
+				start: '2020-7-08',
+				end: '2020-8-20',
 				name: 'Deploy',
 				id: "Task 4",
 				progress: 0,
 				dependencies: 'Task 2'
 			},
 			{
-				start: '2018-10-11',
-				end: '2018-10-11',
+				start: '2020-7-11',
+				end: '2020-8-11',
 				name: 'Go Live!',
 				id: "Task 5",
-				progress: 0,
-				dependencies: 'Task 4',
+				invalid: true,
 				custom_class: 'bar-milestone'
 			},
 			{
-				start: '2014-01-05',
-				end: '2019-10-12',
+				start: '2020-07-05',
+				end: '2020-10-12',
+				name: 'Long term task',
+				id: "Task 6",
+				progress: 0
+			},
+			{
+				start: '2020-07-05',
+				end: '2020-10-12',
+				name: 'Long term task',
+				id: "Task 6",
+				progress: 0
+			},
+			{
+				start: '2020-07-05',
+				end: '2020-10-12',
+				name: 'Long term task',
+				id: "Task 6",
+				progress: 0
+			},
+			{
+				start: '2020-07-05',
+				end: '2020-10-12',
+				name: 'Long term task',
+				id: "Task 6",
+				progress: 0
+			},
+			{
+				start: '2020-07-05',
+				end: '2020-10-12',
+				name: 'Long term task',
+				id: "Task 6",
+				progress: 0
+			},
+			{
+				start: '2020-07-05',
+				end: '2020-10-12',
 				name: 'Long term task',
 				id: "Task 6",
 				progress: 0
@@ -96,8 +138,8 @@
 			on_view_change: function(mode) {
 				console.log(mode);
 			},
-			view_mode: 'Month',
-			language: 'en'
+			date_format: 'YYYY-MM-DD',
+			language: 'zh'
 		});
 		console.log(gantt_chart);
 	</script>

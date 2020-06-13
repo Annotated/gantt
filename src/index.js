@@ -15,8 +15,11 @@ const VIEW_MODE = {
     YEAR: 'Year'
 };
 
+let _tasks = {};
+
 export default class Gantt {
     constructor(wrapper, tasks, options) {
+        _tasks = tasks;
         this.setup_wrapper(wrapper);
         this.setup_options(options);
         this.setup_tasks(tasks);
@@ -78,15 +81,15 @@ export default class Gantt {
             column_width: 30,
             step: 24,
             view_modes: [...Object.values(VIEW_MODE)],
-            bar_height: 20,
-            bar_corner_radius: 3,
+            bar_height: 30,
+            bar_corner_radius: 0,
             arrow_curve: 5,
             padding: 18,
-            view_mode: 'Day',
+            view_mode: 'Month',
             date_format: 'YYYY-MM-DD',
-            popup_trigger: 'click',
+            popup_trigger: 'mousemove',
             custom_popup_html: null,
-            language: 'en'
+            language: 'zh'
         };
         this.options = Object.assign({}, default_options, options);
     }
@@ -391,7 +394,10 @@ export default class Gantt {
                 tick_class += ' thick';
             }
             // thick ticks for quarters
-            if (this.view_is(VIEW_MODE.MONTH) && (date.getMonth() + 1) % 3 === 0) {
+            if (
+                this.view_is(VIEW_MODE.MONTH) &&
+                (date.getMonth() + 1) % 3 === 0
+            ) {
                 tick_class += ' thick';
             }
 
@@ -651,6 +657,7 @@ export default class Gantt {
         let is_resizing_right = false;
         let parent_bar_id = null;
         let bars = []; // instanceof Bar
+        let task = {};
         this.bar_being_dragged = null;
 
         function action_in_progress() {
@@ -659,6 +666,9 @@ export default class Gantt {
 
         $.on(this.$svg, 'mousedown', '.bar-wrapper, .handle', (e, element) => {
             const bar_wrapper = $.closest('.bar-wrapper', element);
+            parent_bar_id = bar_wrapper.getAttribute('data-id');
+            task = _tasks.find(f => f.id == parent_bar_id);
+            if (task.invalid) return;
 
             if (element.classList.contains('left')) {
                 is_resizing_left = true;
@@ -673,7 +683,6 @@ export default class Gantt {
             x_on_start = e.offsetX;
             y_on_start = e.offsetY;
 
-            parent_bar_id = bar_wrapper.getAttribute('data-id');
             const ids = [
                 parent_bar_id,
                 ...this.get_all_dependent_tasks(parent_bar_id)
@@ -877,14 +886,14 @@ export default class Gantt {
         });
     }
 
-    show_popup(options) {
+    show_popup(e, options) {
         if (!this.popup) {
             this.popup = new Popup(
                 this.popup_wrapper,
                 this.options.custom_popup_html
             );
         }
-        this.popup.show(options);
+        this.popup.show(e, options);
     }
 
     hide_popup() {

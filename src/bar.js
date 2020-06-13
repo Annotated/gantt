@@ -1,3 +1,4 @@
+import Color from './color';
 import date_utils from './date_utils';
 import { $, createSVG, animateSVG } from './svg_utils';
 
@@ -18,6 +19,7 @@ export default class Bar {
     prepare() {
         this.prepare_values();
         this.prepare_helpers();
+        this.prepare_color();
     }
 
     prepare_values() {
@@ -66,6 +68,17 @@ export default class Bar {
         };
     }
 
+    prepare_color() {
+        if (!this.task.color || !this.task.color.fill) return;
+        const currentValueColor = new Color({
+            enableAlpha: this.task.color.enableAlpha || false,
+            format: this.task.color.colorFormat || 'hsl'
+        });
+        currentValueColor.fromString(this.task.color.fill);
+        this.progress_color = currentValueColor.progress;
+        this.fill = currentValueColor.value;
+    }
+
     draw() {
         this.draw_bar();
         this.draw_progress_bar();
@@ -82,6 +95,7 @@ export default class Bar {
             rx: this.corner_radius,
             ry: this.corner_radius,
             class: 'bar',
+            style: `fill:${this.fill || null}`,
             append_to: this.bar_group
         });
 
@@ -102,6 +116,7 @@ export default class Bar {
             rx: this.corner_radius,
             ry: this.corner_radius,
             class: 'bar-progress',
+            style: `fill:${this.progress_color || null}`,
             append_to: this.bar_group
         });
 
@@ -148,7 +163,7 @@ export default class Bar {
             append_to: this.handle_group
         });
 
-        if (this.task.progress && this.task.progress < 100) {
+        if (this.task.progress < 100) {
             this.$handle_progress = createSVG('polygon', {
                 points: this.get_progress_polygon_points().join(','),
                 class: 'handle progress',
@@ -188,14 +203,17 @@ export default class Bar {
             this.gantt.unselect_all();
             this.group.classList.toggle('active');
 
-            this.show_popup();
+            this.show_popup(e);
         });
     }
 
-    show_popup() {
+    show_popup(e) {
         if (this.gantt.bar_being_dragged) return;
-
-        const start_date = date_utils.format(this.task._start, 'MMM D', this.gantt.options.language);
+        const start_date = date_utils.format(
+            this.task._start,
+            'MMM D',
+            this.gantt.options.language
+        );
         const end_date = date_utils.format(
             date_utils.add(this.task._end, -1, 'second'),
             'MMM D',
@@ -203,11 +221,11 @@ export default class Bar {
         );
         const subtitle = start_date + ' - ' + end_date;
 
-        this.gantt.show_popup({
+        this.gantt.show_popup(e, {
             target_element: this.$bar,
             title: this.task.name,
             subtitle: subtitle,
-            task: this.task,
+            task: this.task
         });
     }
 
